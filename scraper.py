@@ -6,6 +6,7 @@ import urllib.request
 import shutil
 import tempfile
 import os
+import string
 
 # Idea of parameters
 # URL to donwload
@@ -16,6 +17,13 @@ import os
 # Download should check whether file exists or not
 # Program should give a log of files found. Those downloaded and those already existing
 # Program can also just produce a list of files found perhaps?
+
+def covert_to_filename(s):
+    s = s.replace('&', 'and')
+    valid_chars = "-_.() %s%s" % (string.ascii_letters, string.digits)
+    filename = ''.join(c for c in s if c in valid_chars)
+    filename = filename.replace(' ','_') # I don't like spaces in filenames.
+    return filename
 
 def main():
     parser = argparse.ArgumentParser(description="Fetch files from a given XML file")
@@ -63,6 +71,8 @@ def main():
                 if args.filetitle:
                     title = '_'.join(parent_map[data].find('title').text.split(' ')).lstrip('_')
                     filename = title + '_' + filename
+
+                filename = covert_to_filename(filename)
 
                 output = os.path.join(output_dir, filename)
                 if os.path.exists(output):
