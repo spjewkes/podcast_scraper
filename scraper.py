@@ -23,7 +23,8 @@ def main():
     parser.add_argument('--dest', default=None, type=str,  help='Destination folder')
     parser.add_argument('--dryrun', action='store_true', help='Do dry run test')
     parser.add_argument('--writexml', default=None, type=str, help='Write RSS XML to a specified file (useful for debugging)')
-    parser.add_argument('--fileuniq', action='store_true', help='Tries to make filename unique using URL')
+    parser.add_argument('--fileuniq', action='store_true', help='Tries to make filename unique using full URL path')
+    parser.add_argument('--filetitle', action='store_true', help='Prefix filename with the title')
 
     args = parser.parse_args()
 
@@ -48,6 +49,7 @@ def main():
             # Load XML and look for URLs
             tree = ET.parse(fp.name)
             root = tree.getroot()
+            parent_map = {c:p for p in root.iter() for c in p}
             for data in root.iter('enclosure'):
                 # print(data.get('url'))
                 url = data.get('url')
@@ -58,11 +60,15 @@ def main():
                 else:
                     filename = os.path.basename(url_parsed.path)
 
+                if args.filetitle:
+                    title = '_'.join(parent_map[data].find('title').text.split(' ')).lstrip('_')
+                    filename = title + '_' + filename
+
                 output = os.path.join(output_dir, filename)
                 if os.path.exists(output):
                     print("NOT downloading {} as it already exists".format(filename))
                 else:
-                    print("Downloading {}".format(url_parsed.geturl()))
+                    print("Downloading {} (saving as {})".format(url_parsed.geturl(), filename))
                     if not args.dryrun:
                         # Download and write out file
                         with urllib.request.urlopen(url_parsed.geturl()) as response, open(output, 'wb') as out_file:
