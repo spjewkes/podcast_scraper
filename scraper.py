@@ -17,15 +17,12 @@ import os
 # Program should give a log of files found. Those downloaded and those already existing
 # Program can also just produce a list of files found perhaps?
 
-# example usage
-# ./scraper.py --dest "~/Music/Podcasts/Critical Hit/" http://www.majorspoilers.com/media/criticalhit.xml
-
 def main():
     parser = argparse.ArgumentParser(description="Fetch files from a given XML file")
     parser.add_argument('url', metavar='URL', type=str, help='URL to XML file to scan for the files of a given type')
     parser.add_argument('--dest', default=None, type=str,  help='Destination folder')
     parser.add_argument('--dryrun', action='store_true', help='Do dry run test')
-    parser.add_argument('--writexml', default=None, type=str, help='Write XML to a specified file')
+    parser.add_argument('--writexml', default=None, type=str, help='Write RSS XML to a specified file (useful for debugging)')
     parser.add_argument('--fileuniq', action='store_true', help='Tries to make filename unique using URL')
 
     args = parser.parse_args()
