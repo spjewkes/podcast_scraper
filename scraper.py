@@ -33,59 +33,72 @@ def main():
     parser.add_argument('--writexml', default=None, type=str, help='Write RSS XML to a specified file (useful for debugging)')
     parser.add_argument('--fileuniq', action='store_true', help='Tries to make filename unique using full URL path')
     parser.add_argument('--filetitle', action='store_true', help='Prefix filename with the title')
+    parser.add_argument('--local', action='store_true', help='URL is a local file')
 
     args = parser.parse_args()
 
-    with urllib.request.urlopen(args.url) as f:
+    fp = tempfile.NamedTemporaryFile(mode='w', delete=False)
+
+    if args.local:
+        with open(args.url) as f:
+            # Fetch local file to a temporary file to match what we'd do with a URL
+            fp.write(f.read())
+            fp.close()
+    else:
+        with urllib.request.urlopen(args.url) as f:
+            # Fetch URL to a temporary file
+            fp.write(f.read().decode('utf-8'))
+            fp.close()
+
+    if args.writexml:
+        shutil.copyfile(fp.name, args.writexml)
+
+    if not args.dest:
+        print("No destination specified. Not downloading.")
+        quit()
         
-        # Fetch URL to a temporary file
-        fp = tempfile.NamedTemporaryFile(mode='w', delete=False)
-        fp.write(f.read().decode('utf-8'))
-        fp.close()
+    if args.dest:
+        output_dir = os.path.expanduser(args.dest)
+        output_dir = os.path.abspath(output_dir)
 
-        if args.writexml:
-            shutil.copyfile(fp.name, args.writexml)
+        if not os.path.isdir(output_dir):
+            print("The directory: {} cannot be found".format(output_dir))
+            quit()
 
-        if args.dest:
-            output_dir = os.path.expanduser(args.dest)
-            output_dir = os.path.abspath(output_dir)
+        # Load XML and look for URLs
+        tree = ET.parse(fp.name)
+        root = tree.getroot()
+        parent_map = {c:p for p in root.iter() for c in p}
+        # print(root)
+        for data in root.iter('enclosure'):
+            # print(data.get('url'))
+            # print(data.get('cartwall__entry'))
+            url = data.get('url')
+            url_parsed = urllib.parse.urlparse(url)
 
-            if not os.path.isdir(output_dir):
-                print("The directory: {} cannot be found".format(output_dir))
-                quit()
+            if args.fileuniq:
+                filename = '_'.join(url_parsed.path.split('/')).lstrip('_')
+            else:
+                filename = os.path.basename(url_parsed.path)
 
-            # Load XML and look for URLs
-            tree = ET.parse(fp.name)
-            root = tree.getroot()
-            parent_map = {c:p for p in root.iter() for c in p}
-            for data in root.iter('enclosure'):
-                # print(data.get('url'))
-                url = data.get('url')
-                url_parsed = urllib.parse.urlparse(url)
+            if args.filetitle:
+                title = '_'.join(parent_map[data].find('title').text.split(' ')).lstrip('_')
+                filename = title + '_' + filename
 
-                if args.fileuniq:
-                    filename = '_'.join(url_parsed.path.split('/')).lstrip('_')
-                else:
-                    filename = os.path.basename(url_parsed.path)
+            filename = covert_to_filename(filename)
 
-                if args.filetitle:
-                    title = '_'.join(parent_map[data].find('title').text.split(' ')).lstrip('_')
-                    filename = title + '_' + filename
+            output = os.path.join(output_dir, filename)
+            if os.path.exists(output):
+                print("NOT downloading {} as it already exists".format(filename))
+            else:
+                print("Downloading {} (saving as {})".format(url_parsed.geturl(), filename))
+                if not args.dryrun:
+                    # Download and write out file
+                    with urllib.request.urlopen(url_parsed.geturl()) as response, open(output, 'wb') as out_file:
+                        shutil.copyfileobj(response, out_file)
 
-                filename = covert_to_filename(filename)
-
-                output = os.path.join(output_dir, filename)
-                if os.path.exists(output):
-                    print("NOT downloading {} as it already exists".format(filename))
-                else:
-                    print("Downloading {} (saving as {})".format(url_parsed.geturl(), filename))
-                    if not args.dryrun:
-                        # Download and write out file
-                        with urllib.request.urlopen(url_parsed.geturl()) as response, open(output, 'wb') as out_file:
-                            shutil.copyfileobj(response, out_file)
-
-        # Clean up
-        os.unlink(fp.name)
+    # Clean up
+    os.unlink(fp.name)
 
 if __name__ == "__main__":
     main()
